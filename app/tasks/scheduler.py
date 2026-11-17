@@ -1,11 +1,10 @@
-from datetime import datetime, timezone
-
 from celery.utils.log import get_task_logger
 
 from app.tasks import celery_app
 from app.extensions import db
 from app.models.job import Job
 from app.models.sender import SenderAddress
+from app.timeutils import utc_now_naive
 
 logger = get_task_logger(__name__)
 
@@ -38,7 +37,8 @@ def poll_pending_jobs():
     """
     from app.tasks.dispatch import dispatch_job
 
-    now = datetime.now(timezone.utc)
+    # scheduled_at is stored as naive UTC (see app/timeutils.py).
+    now = utc_now_naive()
     due_jobs = Job.query.filter(
         Job.status == "pending",
         Job.scheduled_at.isnot(None),

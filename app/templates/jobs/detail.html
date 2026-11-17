@@ -70,7 +70,7 @@
     <p class="text-sm text-gray-500 mb-6">
         Template: {{ job.template.name if job.template else "—" }} ·
         Recipient list: {{ job.recipient_list.name if job.recipient_list else "—" }}
-        {% if job.scheduled_at %} · Scheduled: {{ job.scheduled_at.strftime("%Y-%m-%d %H:%M") }}{% endif %}
+        {% if job.scheduled_at %} · Scheduled: {{ job.scheduled_at | ist }}{% endif %}
     </p>
 
     <div class="w-full bg-gray-100 rounded-full h-2 mb-6 overflow-hidden">
@@ -152,7 +152,7 @@
                 <td class="px-4 py-3">{{ log.sender.email_address if log.sender else "—" }}</td>
                 <td class="px-4 py-3">{{ log.error_code or "—" }}</td>
                 <td class="px-4 py-3 text-gray-500">{{ log.error_message or "—" }}</td>
-                <td class="px-4 py-3 text-gray-500">{{ log.sent_at.strftime("%Y-%m-%d %H:%M") if log.sent_at else "—" }}</td>
+                <td class="px-4 py-3 text-gray-500">{{ log.sent_at | ist }}</td>
             </tr>
             {% endfor %}
         </tbody>

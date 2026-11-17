@@ -64,4 +64,8 @@ def create_app(log_filename="app.log"):
 
     register_error_handlers(app)
 
+    from app.timeutils import format_ist
+
+    app.jinja_env.filters["ist"] = format_ist
+
     return app

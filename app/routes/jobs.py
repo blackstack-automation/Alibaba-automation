@@ -16,6 +16,7 @@ from app.models.recipient import RecipientList
 from app.models.send_log import SendLog
 from app.services.allocation import build_allocation_plan
 from app.services import redis_counters
+from app.timeutils import ist_to_utc_naive, utc_now_naive
 
 TERMINAL_STATUSES = ("completed", "completed_with_errors", "failed", "cancelled")
 
@@ -86,8 +87,19 @@ def new_job():
         return redirect(url_for("recipients.list_recipients"))
 
     if form.validate_on_submit():
-        if form.schedule_choice.data == "later" and not form.scheduled_at.data:
-            form.scheduled_at.errors.append("Choose a date/time for a scheduled job.")
+        scheduled_utc = None
+        schedule_error = None
+        if form.schedule_choice.data == "later":
+            if not form.scheduled_at.data:
+                schedule_error = "Choose a date/time for a scheduled job."
+            else:
+                # The form value is a wall-clock time in IST; store UTC.
+                scheduled_utc = ist_to_utc_naive(form.scheduled_at.data)
+                if scheduled_utc <= utc_now_naive():
+                    schedule_error = "That time (IST) has already passed — pick a future time."
+
+        if schedule_error:
+            form.scheduled_at.errors.append(schedule_error)
         else:
             recipient_list = db.get_or_404(RecipientList, form.recipient_list_id.data)
             plan, remaining = build_allocation_plan(recipient_list.valid_count)
@@ -103,7 +115,7 @@ def new_job():
                 recipient_list_id=form.recipient_list_id.data,
                 subject_override=form.subject_override.data or None,
                 status="pending",
-                scheduled_at=form.scheduled_at.data if form.schedule_choice.data == "later" else None,
+                scheduled_at=scheduled_utc,
                 total_recipients=allocated_total,
                 created_by=current_user.id,
             )
@@ -245,7 +257,7 @@ def export_failed(job_id):
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["email", "sender", "error_code", "error_message", "sent_at"])
+    writer.writerow(["email", "sender", "error_code", "error_message", "sent_at_utc"])
     for log in logs:
         writer.writerow(
             [

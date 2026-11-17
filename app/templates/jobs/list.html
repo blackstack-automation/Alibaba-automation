@@ -33,7 +33,10 @@
                 <td class="px-4 py-3">{{ status_badge(job.status) }}</td>
                 <td class="px-4 py-3">{{ job.sent_count }} / {{ job.total_recipients }}</td>
                 <td class="px-4 py-3 text-gray-500">
-                    {{ job.scheduled_at.strftime("%Y-%m-%d %H:%M") if job.scheduled_at else (job.started_at.strftime("%Y-%m-%d %H:%M") if job.started_at else "—") }}
+                    {% if job.scheduled_at and job.status == "pending" %}Scheduled {{ job.scheduled_at | ist }}
+                    {% elif job.started_at %}Started {{ job.started_at | ist }}
+                    {% elif job.scheduled_at %}{{ job.scheduled_at | ist }}
+                    {% else %}—{% endif %}
                 </td>
             </tr>
             {% endfor %}
