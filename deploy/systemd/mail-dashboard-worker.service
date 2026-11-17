@@ -1,0 +1,16 @@
+[Unit]
+Description=Mail Dashboard (Celery worker)
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+User=__APP_USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=__APP_DIR__/venv/bin/celery -A celery_worker.celery worker --loglevel=info --concurrency=4
+# A dead worker mid-job means a stuck job, so always come back.
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

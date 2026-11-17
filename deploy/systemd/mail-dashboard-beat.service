@@ -1,0 +1,15 @@
+[Unit]
+Description=Mail Dashboard (Celery beat scheduler)
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+User=__APP_USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=__APP_DIR__/venv/bin/celery -A celery_beat.celery beat --loglevel=info --schedule __APP_DIR__/instance/celerybeat-schedule
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

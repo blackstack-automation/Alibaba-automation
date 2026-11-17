@@ -14,3 +14,4 @@ instance/
 .DS_Store
 node_modules/
 .claude/
+celerybeat-schedule*
