@@ -1,6 +1,7 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SelectField, TextAreaField, IntegerField, DateTimeLocalField
+from wtforms.widgets import HiddenInput
 from wtforms.validators import DataRequired, Optional, Length, NumberRange, Email
 
 
@@ -67,3 +68,5 @@ class JobForm(FlaskForm):
     scheduled_at = DateTimeLocalField(
         "Scheduled for", validators=[Optional()], format="%Y-%m-%dT%H:%M"
     )
+    # Set (hidden) when this job is a follow-up to an earlier one.
+    parent_job_id = IntegerField(widget=HiddenInput(), validators=[Optional()])

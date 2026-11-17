@@ -15,6 +15,7 @@ from app.models.template import EmailTemplate
 from app.models.recipient import RecipientList
 from app.models.send_log import SendLog
 from app.services.allocation import build_allocation_plan
+from app.services.followup import eligible_count, followup_blocker, rebuild_allocations
 from app.services import redis_counters
 from app.timeutils import ist_to_utc_naive, utc_now_naive
 
@@ -39,7 +40,17 @@ def _try_dispatch(job):
         )
 
 
-def _populate_choices(form):
+def _populate_choices(form, parent=None):
+    if parent is not None:
+        # A follow-up continues the parent's campaign: same template, same list.
+        form.template_id.choices = [(parent.template_id, parent.template.name)]
+        form.recipient_list_id.choices = [
+            (
+                parent.recipient_list_id,
+                f"{parent.recipient_list.name} ({eligible_count(parent)} not yet emailed)",
+            )
+        ]
+        return
     form.template_id.choices = [
         (t.id, t.name) for t in EmailTemplate.query.order_by(EmailTemplate.name).all()
     ]
@@ -60,10 +71,16 @@ def list_jobs():
 @login_required
 def preview_allocation():
     recipient_list = db.get_or_404(RecipientList, request.form.get("recipient_list_id", type=int))
-    plan, remaining = build_allocation_plan(recipient_list.valid_count)
+    parent_id = request.form.get("parent_job_id", type=int)
+    if parent_id:
+        # Follow-up: only the recipients nobody in the chain has emailed yet.
+        total = eligible_count(db.get_or_404(Job, parent_id))
+    else:
+        total = recipient_list.valid_count
+    plan, remaining = build_allocation_plan(total)
     return jsonify(
         {
-            "total": recipient_list.valid_count,
+            "total": total,
             "remaining": remaining,
             "plan": [
                 {"sender_email": item["sender"].email_address, "count": item["count"]}
@@ -77,7 +94,21 @@ def preview_allocation():
 @login_required
 def new_job():
     form = JobForm()
-    _populate_choices(form)
+
+    # A follow-up carries its parent's id: in the URL when the form is opened,
+    # in the hidden field when it's submitted.
+    parent = None
+    parent_id = (
+        form.parent_job_id.data if request.method == "POST" else request.args.get("parent", type=int)
+    )
+    if parent_id:
+        parent = db.get_or_404(Job, parent_id)
+        blocker = followup_blocker(parent)
+        if blocker:
+            flash(blocker, "error")
+            return redirect(url_for("jobs.view_job", job_id=parent.id))
+
+    _populate_choices(form, parent)
 
     if not form.template_id.choices:
         flash("Upload a template before creating a job.", "error")
@@ -85,6 +116,13 @@ def new_job():
     if not form.recipient_list_id.choices:
         flash("Upload a recipient list before creating a job.", "error")
         return redirect(url_for("recipients.list_recipients"))
+
+    if parent is not None and request.method == "GET":
+        form.parent_job_id.data = parent.id
+        form.name.data = f"{parent.name} (follow-up)"
+        form.template_id.data = parent.template_id
+        form.recipient_list_id.data = parent.recipient_list_id
+        form.subject_override.data = parent.subject_override or ""
 
     if form.validate_on_submit():
         scheduled_utc = None
@@ -101,14 +139,6 @@ def new_job():
         if schedule_error:
             form.scheduled_at.errors.append(schedule_error)
         else:
-            recipient_list = db.get_or_404(RecipientList, form.recipient_list_id.data)
-            plan, remaining = build_allocation_plan(recipient_list.valid_count)
-            # The job covers only what quota allows today; the rest needs a
-            # follow-up job. total_recipients must be that dispatched count, or
-            # a partially-allocated job would wait forever for recipients it
-            # never sent and never complete.
-            allocated_total = sum(item["count"] for item in plan)
-
             job = Job(
                 name=form.name.data.strip(),
                 template_id=form.template_id.data,
@@ -116,33 +146,32 @@ def new_job():
                 subject_override=form.subject_override.data or None,
                 status="pending",
                 scheduled_at=scheduled_utc,
-                total_recipients=allocated_total,
+                total_recipients=0,
                 created_by=current_user.id,
+                parent_job_id=parent.id if parent else None,
             )
             db.session.add(job)
             db.session.flush()
 
-            for item in plan:
-                db.session.add(
-                    JobAllocation(
-                        job_id=job.id,
-                        sender_id=item["sender_id"],
-                        allocated_count=item["count"],
-                    )
-                )
+            # The job covers only what quota allows; the rest is left for a
+            # follow-up. total_recipients is that allocated count, or a
+            # partially-allocated job would wait forever for recipients it
+            # never sent and never complete. For a follow-up, "eligible"
+            # already excludes everyone the earlier jobs handled.
+            eligible, allocated_total, remaining = rebuild_allocations(job)
             db.session.commit()
 
             if remaining > 0:
                 flash(
-                    f"Job '{job.name}' created, but only {allocated_total} of "
-                    f"{recipient_list.valid_count} recipients could be allocated given current quota. "
-                    f"{remaining} will need a follow-up job.",
+                    f"Job '{job.name}' created, but current quota covers only {allocated_total} "
+                    f"of {eligible} recipients. The other {remaining} stay unsent — once this "
+                    f"job finishes, use 'Create follow-up job' on its page.",
                     "warning",
                 )
             else:
                 flash(f"Job '{job.name}' created.", "success")
 
-            if job.scheduled_at is None and plan:
+            if job.scheduled_at is None and allocated_total > 0:
                 _try_dispatch(job)
 
             return redirect(url_for("jobs.view_job", job_id=job.id))
@@ -150,7 +179,13 @@ def new_job():
     template_subjects = {
         t.id: (t.subject_default or "") for t in EmailTemplate.query.all()
     }
-    return render_template("jobs/form.html", form=form, template_subjects=template_subjects)
+    return render_template(
+        "jobs/form.html",
+        form=form,
+        template_subjects=template_subjects,
+        parent=parent,
+        parent_unsent=eligible_count(parent) if parent else None,
+    )
 
 
 @jobs_bp.route("/<int:job_id>")
@@ -164,8 +199,25 @@ def view_job(job_id):
         .limit(50)
         .all()
     )
+    parent = db.session.get(Job, job.parent_job_id) if job.parent_job_id else None
+    follow_ups = Job.query.filter_by(parent_job_id=job.id).order_by(Job.id).all()
+
+    # Overflow: once a job has finished, how many people on its list still
+    # haven't been emailed by it (or any job it's linked to), and can we continue?
+    followup = None
+    if job.status in TERMINAL_STATUSES:
+        unsent = eligible_count(job)
+        if unsent:
+            followup = {"unsent": unsent, "blocker": followup_blocker(job)}
+
     return render_template(
-        "jobs/detail.html", job=job, allocations=allocations, failed_logs=failed_logs
+        "jobs/detail.html",
+        job=job,
+        allocations=allocations,
+        failed_logs=failed_logs,
+        parent=parent,
+        follow_ups=follow_ups,
+        followup=followup,
     )
 
 

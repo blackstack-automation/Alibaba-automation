@@ -1,12 +1,22 @@
 {% extends "base.html" %}
 {% block title %}New Job — Mail Dashboard{% endblock %}
 {% block content %}
-<h1 class="text-xl font-semibold mb-6">New Job</h1>
+<h1 class="text-xl font-semibold mb-6">{{ "New Follow-up Job" if parent else "New Job" }}</h1>
+
+{% if parent %}
+<div class="max-w-2xl mb-4 border border-blue-200 bg-blue-50 text-blue-900 rounded-lg px-4 py-3 text-sm">
+    Follow-up to <a href="{{ url_for('jobs.view_job', job_id=parent.id) }}" class="underline">{{ parent.name }}</a>.
+    <strong>{{ parent_unsent }}</strong> recipient{{ "" if parent_unsent == 1 else "s" }} on this list
+    haven't been emailed yet. Anyone already sent to (or that failed) in the earlier job(s) is skipped, so nobody gets the same email twice.
+    The template and list stay the same as the original job.
+</div>
+{% endif %}
 
 <div class="bg-white border rounded-lg p-6 max-w-2xl"
      x-data='{
         schedule: {{ form.schedule_choice.data | tojson }},
         scheduledAt: {{ (form.scheduled_at.raw_data or [""])[0] | tojson }},
+        parentId: {{ (parent.id if parent else None) | tojson }},
         templateSubjects: {{ template_subjects | tojson }},
         usTimes() {
             // The typed time is IST (UTC+5:30, no DST). Convert to an instant,
@@ -32,6 +42,7 @@
             this.preview = null;
             const body = new FormData();
             body.append("recipient_list_id", listId);
+            if (this.parentId) body.append("parent_job_id", this.parentId);
             const res = await csrfFetch("{{ url_for('jobs.preview_allocation') }}", { method: "POST", body });
             this.preview = await res.json();
             this.previewLoading = false;

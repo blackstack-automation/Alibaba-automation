@@ -71,7 +71,25 @@
         Template: {{ job.template.name if job.template else "—" }} ·
         Recipient list: {{ job.recipient_list.name if job.recipient_list else "—" }}
         {% if job.scheduled_at %} · Scheduled: {{ job.scheduled_at | ist }}{% endif %}
+        {% if parent %} · Follow-up to <a href="{{ url_for('jobs.view_job', job_id=parent.id) }}" class="text-blue-600 hover:underline">{{ parent.name }}</a>{% endif %}
+        {% if follow_ups %} · Follow-ups:
+            {% for f in follow_ups %}<a href="{{ url_for('jobs.view_job', job_id=f.id) }}" class="text-blue-600 hover:underline">{{ f.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+        {% endif %}
     </p>
+
+    {% if followup %}
+    <div class="mb-6 border border-yellow-300 bg-yellow-50 rounded-lg px-4 py-3 flex items-center justify-between gap-4">
+        <div class="text-sm text-yellow-900">
+            <strong>{{ followup.unsent }}</strong> recipient{{ "" if followup.unsent == 1 else "s" }} on this list
+            haven't been emailed yet.
+            {% if followup.blocker %}<span class="block text-xs mt-1">{{ followup.blocker }}</span>{% endif %}
+        </div>
+        {% if not followup.blocker %}
+        <a href="{{ url_for('jobs.new_job', parent=job.id) }}"
+           class="shrink-0 bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Create follow-up job</a>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <div class="w-full bg-gray-100 rounded-full h-2 mb-6 overflow-hidden">
         <div class="bg-blue-600 h-2 transition-all" :style="`width: ${pct}%`"></div>

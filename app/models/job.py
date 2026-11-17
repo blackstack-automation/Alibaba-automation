@@ -35,6 +35,8 @@ class Job(db.Model):
     sent_count = db.Column(db.Integer, nullable=False, default=0)
     failed_count = db.Column(db.Integer, nullable=False, default=0)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    # Set when this job continues an earlier job on the same list (a follow-up).
+    parent_job_id = db.Column(db.Integer, db.ForeignKey("jobs.id"))
     created_at = db.Column(db.DateTime, default=_now)
     updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
@@ -43,3 +45,6 @@ class Job(db.Model):
     allocations = db.relationship(
         "JobAllocation", backref="job", cascade="all, delete-orphan", lazy="dynamic"
     )
+
+
+db.Index("idx_jobs_parent", Job.parent_job_id)
