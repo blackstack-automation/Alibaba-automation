@@ -1,8 +1,10 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.forms import TemplateForm
+from app.models.job import Job
 from app.models.template import EmailTemplate
 from app.services.template_validate import html_size_bytes, validate_html_size, MAX_TEMPLATE_SIZE_BYTES
 
@@ -96,7 +98,22 @@ def edit_template(template_id):
 def delete_template(template_id):
     template = db.get_or_404(EmailTemplate, template_id)
     name = template.name
-    db.session.delete(template)
-    db.session.commit()
+
+    job_count = Job.query.filter_by(template_id=template.id).count()
+    if job_count:
+        flash(
+            f"Can't delete '{name}': it is used by {job_count} job(s). "
+            f"Jobs keep a reference to the exact template they sent.",
+            "error",
+        )
+        return redirect(url_for("mail_templates.view_template", template_id=template.id))
+
+    try:
+        db.session.delete(template)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash(f"Can't delete '{name}': it is still referenced by other records.", "error")
+        return redirect(url_for("mail_templates.view_template", template_id=template.id))
     flash(f"Template '{name}' deleted.", "success")
     return redirect(url_for("mail_templates.list_templates"))

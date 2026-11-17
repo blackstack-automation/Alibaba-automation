@@ -56,8 +56,13 @@ def resume_job(job_id):
     if job is None:
         return
 
+    # Only final results count. A "retrying" row is an attempt that was
+    # re-routed to another sender, so that recipient may still be outstanding.
     already_attempted = {
-        row.recipient_id for row in SendLog.query.filter_by(job_id=job.id).all()
+        row.recipient_id
+        for row in SendLog.query.filter(
+            SendLog.job_id == job.id, SendLog.status.in_(("sent", "failed"))
+        ).all()
     }
     recipients = (
         Recipient.query.filter_by(list_id=job.recipient_list_id, is_valid_format=1)

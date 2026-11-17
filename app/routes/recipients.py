@@ -1,7 +1,9 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
+from app.models.job import Job
 from app.models.recipient import RecipientList, Recipient
 from app.services import csv_import
 
@@ -128,7 +130,21 @@ def view_list(list_id):
 def delete_list(list_id):
     recipient_list = db.get_or_404(RecipientList, list_id)
     name = recipient_list.name
-    db.session.delete(recipient_list)
-    db.session.commit()
+
+    job_count = Job.query.filter_by(recipient_list_id=recipient_list.id).count()
+    if job_count:
+        flash(
+            f"Can't delete '{name}': it is used by {job_count} job(s) and their send history.",
+            "error",
+        )
+        return redirect(url_for("recipients.view_list", list_id=recipient_list.id))
+
+    try:
+        db.session.delete(recipient_list)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash(f"Can't delete '{name}': it is still referenced by other records.", "error")
+        return redirect(url_for("recipients.view_list", list_id=recipient_list.id))
     flash(f"Recipient list '{name}' deleted.", "success")
     return redirect(url_for("recipients.list_recipients"))

@@ -1,9 +1,12 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.forms import SenderForm
 from app.models.account import Account
+from app.models.job_allocation import JobAllocation
+from app.models.send_log import SendLog
 from app.models.sender import SenderAddress
 from app.services.quota import sent_today_count
 
@@ -77,8 +80,25 @@ def delete_sender(sender_id):
     sender = db.get_or_404(SenderAddress, sender_id)
     account_id = sender.account_id
     email = sender.email_address
-    db.session.delete(sender)
-    db.session.commit()
+
+    if (
+        JobAllocation.query.filter_by(sender_id=sender.id).first()
+        or SendLog.query.filter_by(sender_id=sender.id).first()
+    ):
+        flash(
+            f"Can't delete '{email}': it is part of existing jobs / send history. "
+            f"Set its status to 'disabled' instead.",
+            "error",
+        )
+        return redirect(url_for("senders.list_senders", account_id=account_id))
+
+    try:
+        db.session.delete(sender)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash(f"Can't delete '{email}': it is still referenced by other records.", "error")
+        return redirect(url_for("senders.list_senders", account_id=account_id))
     flash(f"Sender '{email}' deleted.", "success")
     return redirect(url_for("senders.list_senders", account_id=account_id))
 

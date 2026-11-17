@@ -1,9 +1,12 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.forms import AccountForm
 from app.models.account import Account
+from app.models.job_allocation import JobAllocation
+from app.models.send_log import SendLog
 from app.services.alibaba_client import encrypt_secret, decrypt_secret, test_connection
 
 accounts_bp = Blueprint("accounts", __name__)
@@ -66,8 +69,26 @@ def edit_account(account_id):
 def delete_account(account_id):
     account = db.get_or_404(Account, account_id)
     label = account.label
-    db.session.delete(account)
-    db.session.commit()
+
+    sender_ids = [s.id for s in account.senders.all()]
+    if sender_ids and (
+        JobAllocation.query.filter(JobAllocation.sender_id.in_(sender_ids)).first()
+        or SendLog.query.filter(SendLog.sender_id.in_(sender_ids)).first()
+    ):
+        flash(
+            f"Can't delete '{label}': its senders are part of existing jobs / send history, "
+            f"which would be orphaned. Set its senders to 'disabled' instead.",
+            "error",
+        )
+        return redirect(url_for("accounts.list_accounts"))
+
+    try:
+        db.session.delete(account)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        flash(f"Can't delete '{label}': it is still referenced by other records.", "error")
+        return redirect(url_for("accounts.list_accounts"))
     flash(f"Account '{label}' deleted.", "success")
     return redirect(url_for("accounts.list_accounts"))
 

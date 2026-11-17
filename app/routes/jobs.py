@@ -91,6 +91,11 @@ def new_job():
         else:
             recipient_list = db.get_or_404(RecipientList, form.recipient_list_id.data)
             plan, remaining = build_allocation_plan(recipient_list.valid_count)
+            # The job covers only what quota allows today; the rest needs a
+            # follow-up job. total_recipients must be that dispatched count, or
+            # a partially-allocated job would wait forever for recipients it
+            # never sent and never complete.
+            allocated_total = sum(item["count"] for item in plan)
 
             job = Job(
                 name=form.name.data.strip(),
@@ -99,7 +104,7 @@ def new_job():
                 subject_override=form.subject_override.data or None,
                 status="pending",
                 scheduled_at=form.scheduled_at.data if form.schedule_choice.data == "later" else None,
-                total_recipients=recipient_list.valid_count,
+                total_recipients=allocated_total,
                 created_by=current_user.id,
             )
             db.session.add(job)
@@ -117,8 +122,8 @@ def new_job():
 
             if remaining > 0:
                 flash(
-                    f"Job '{job.name}' created, but only {job.total_recipients - remaining} of "
-                    f"{job.total_recipients} recipients could be allocated given current quota. "
+                    f"Job '{job.name}' created, but only {allocated_total} of "
+                    f"{recipient_list.valid_count} recipients could be allocated given current quota. "
                     f"{remaining} will need a follow-up job.",
                     "warning",
                 )

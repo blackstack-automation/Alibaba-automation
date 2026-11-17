@@ -55,6 +55,9 @@ def test_connection(access_key_id: str, access_key_secret: str, region_endpoint:
             "month_quota": body.month_quota,
         }
     except TeaException as exc:
-        return {"ok": False, "error": f"{exc.code}: {exc.message}"}
+        # Network failures arrive as an UnretryableException with no code.
+        if exc.code:
+            return {"ok": False, "error": f"{exc.code}: {exc.message}"}
+        return {"ok": False, "error": str(exc) or type(exc).__name__}
     except Exception as exc:  # network errors, etc.
         return {"ok": False, "error": str(exc)}
