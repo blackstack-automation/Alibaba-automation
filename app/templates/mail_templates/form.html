@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if template else "Upload" }} Template — Mail Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-6">{{ "Edit" if template else "Upload" }} Template</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+     x-data='{
+        tab: "upload",
+        subject: {{ (form.subject_default.data or "") | tojson }},
+        previewHtml: {{ (form.html_paste.data or "") | tojson }},
+        get sizeKB() { return (new Blob([this.previewHtml]).size / 1024).toFixed(1); },
+        get overLimit() { return new Blob([this.previewHtml]).size > {{ (80 * 1024) }}; },
+        onFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => { this.previewHtml = reader.result; };
+            reader.readAsText(file);
+        }
+     }'
+>
+    <div class="bg-white border rounded-lg p-6">
+        <form method="POST" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Name</label>
+                {{ form.name(class_="w-full border rounded px-3 py-2 text-sm") }}
+                {% for error in form.name.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">
+                    Default subject <span class="text-gray-400" x-text="`(${subject.length}/100)`"></span>
+                </label>
+                {{ form.subject_default(**{"class": "w-full border rounded px-3 py-2 text-sm", "maxlength": "100", "x-model": "subject"}) }}
+                {% for error in form.subject_default.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Description</label>
+                {{ form.description(class_="w-full border rounded px-3 py-2 text-sm", rows=2) }}
+            </div>
+
+            <div class="mb-2 border-b flex gap-4 text-sm">
+                <button type="button" x-on:click="tab = 'upload'"
+                    :class="tab === 'upload' ? 'border-b-2 border-gray-900 font-medium' : 'text-gray-500'"
+                    class="pb-2">Upload .html file</button>
+                <button type="button" x-on:click="tab = 'paste'"
+                    :class="tab === 'paste' ? 'border-b-2 border-gray-900 font-medium' : 'text-gray-500'"
+                    class="pb-2">Paste HTML</button>
+            </div>
+
+            <div class="mb-4" x-show="tab === 'upload'">
+                {{ form.html_file(**{"class": "w-full border rounded px-3 py-2 text-sm", "x-on:change": "onFile($event)"}) }}
+                {% for error in form.html_file.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+
+            <div class="mb-4" x-show="tab === 'paste'">
+                {{ form.html_paste(**{"class": "w-full border rounded px-3 py-2 text-sm font-mono", "rows": 10, "x-model": "previewHtml"}) }}
+                {% for error in form.html_paste.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+            </div>
+
+            <p class="text-xs mb-4" :class="overLimit ? 'text-red-600 font-medium' : 'text-gray-500'">
+                Size: <span x-text="sizeKB"></span> KB / 80 KB limit
+                <span x-show="overLimit"> — exceeds limit</span>
+            </p>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-1">Plaintext body (optional)</label>
+                {{ form.text_body(class_="w-full border rounded px-3 py-2 text-sm", rows=3) }}
+            </div>
+
+            <div class="flex gap-3">
+                <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Save</button>
+                <a href="{{ url_for('mail_templates.list_templates') }}" class="border text-sm rounded px-4 py-2 hover:bg-gray-50">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white border rounded-lg p-4">
+        <div class="text-sm font-medium mb-2">Live preview</div>
+        <iframe :srcdoc="previewHtml" sandbox="" class="w-full h-[500px] border rounded"></iframe>
+    </div>
+</div>
+{% endblock %}

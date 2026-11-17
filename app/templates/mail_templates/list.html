@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Templates — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold">Templates</h1>
+    <a href="{{ url_for('mail_templates.new_template') }}" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">
+        + Upload Template
+    </a>
+</div>
+
+{% if templates %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    {% for template in templates %}
+    <a href="{{ url_for('mail_templates.view_template', template_id=template.id) }}"
+       class="bg-white border rounded-lg overflow-hidden hover:shadow-sm transition-shadow block">
+        <div class="h-40 overflow-hidden border-b bg-gray-50 relative">
+            <iframe srcdoc="{{ template.html_body }}" sandbox=""
+                    class="absolute top-0 left-0 w-[400%] h-[400%] origin-top-left pointer-events-none"
+                    style="transform: scale(0.25);"></iframe>
+        </div>
+        <div class="p-3">
+            <div class="font-medium text-sm truncate">{{ template.name }}</div>
+            <div class="flex items-center justify-between mt-1 text-xs text-gray-500">
+                <span>{{ (template.size_bytes / 1024) | round(1) }} KB</span>
+                {% if template.size_bytes > max_size_bytes * 0.9 %}
+                <span class="text-yellow-700 bg-yellow-100 rounded-full px-2 py-0.5">near limit</span>
+                {% endif %}
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500">
+    No templates yet. Upload your first HTML template to get started.
+</div>
+{% endif %}
+{% endblock %}

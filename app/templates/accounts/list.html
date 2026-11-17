@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "partials/_status_badge.html" import status_badge %}
+{% block title %}Accounts — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold">Accounts</h1>
+    <a href="{{ url_for('accounts.new_account') }}" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">
+        + Add Account
+    </a>
+</div>
+
+{% if accounts %}
+<div class="bg-white border rounded-lg overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">Label</th>
+                <th class="px-4 py-3">Senders</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for account in accounts %}
+            <tr>
+                <td class="px-4 py-3 font-medium">{{ account.label }}</td>
+                <td class="px-4 py-3">{{ account.senders.count() }}</td>
+                <td class="px-4 py-3">{{ status_badge(account.status) }}</td>
+                <td class="px-4 py-3">
+                    <div class="flex gap-3">
+                        <a href="{{ url_for('senders.list_senders', account_id=account.id) }}" class="text-blue-600 hover:underline">Senders</a>
+                        <a href="{{ url_for('accounts.edit_account', account_id=account.id) }}" class="text-blue-600 hover:underline">Edit</a>
+                        <form method="POST" action="{{ url_for('accounts.delete_account', account_id=account.id) }}" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="button" class="text-red-600 hover:underline"
+                                onclick="return requestConfirm(this.closest('form'), &quot;Delete account '{{ account.label }}'? This also deletes its senders. This cannot be undone.&quot;)">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500">
+    No accounts yet. Add your first Alibaba Cloud account to get started.
+</div>
+{% endif %}
+{% endblock %}

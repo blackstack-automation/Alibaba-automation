@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "partials/_status_badge.html" import status_badge %}
+{% block title %}Senders — {{ account.label }} — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="text-sm text-gray-500 mb-2">
+    <a href="{{ url_for('accounts.list_accounts') }}" class="hover:underline">Accounts</a> / {{ account.label }}
+</div>
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold">Senders</h1>
+    <a href="{{ url_for('senders.new_sender', account_id=account.id) }}" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">
+        + Add Sender
+    </a>
+</div>
+
+{% if senders %}
+<div class="bg-white border rounded-lg overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">Email</th>
+                <th class="px-4 py-3">Alias</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Baseline quota</th>
+                <th class="px-4 py-3">Sent today</th>
+                <th class="px-4 py-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for sender in senders %}
+            <tr>
+                <td class="px-4 py-3 font-medium">{{ sender.email_address }}</td>
+                <td class="px-4 py-3">{{ sender.from_alias or "—" }}</td>
+                <td class="px-4 py-3">{{ status_badge(sender.status) }}</td>
+                <td class="px-4 py-3">{{ sender.baseline_daily_quota }}</td>
+                <td class="px-4 py-3">{{ sent_today_by_id.get(sender.id, 0) }}</td>
+                <td class="px-4 py-3">
+                    <div class="flex gap-3">
+                        <a href="{{ url_for('senders.edit_sender', sender_id=sender.id) }}" class="text-blue-600 hover:underline">Edit</a>
+                        <form method="POST" action="{{ url_for('senders.delete_sender', sender_id=sender.id) }}" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="button" class="text-red-600 hover:underline"
+                                onclick="return requestConfirm(this.closest('form'), &quot;Delete sender '{{ sender.email_address }}'? This cannot be undone.&quot;)">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500">
+    No senders yet for this account.
+</div>
+{% endif %}
+{% endblock %}

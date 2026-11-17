@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}New Job — Mail Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-6">New Job</h1>
+
+<div class="bg-white border rounded-lg p-6 max-w-2xl"
+     x-data='{
+        schedule: {{ form.schedule_choice.data | tojson }},
+        templateSubjects: {{ template_subjects | tojson }},
+        preview: null,
+        previewLoading: false,
+        async previewAllocation() {
+            const listId = this.$refs.recipientList.value;
+            if (!listId) return;
+            this.previewLoading = true;
+            this.preview = null;
+            const body = new FormData();
+            body.append("recipient_list_id", listId);
+            const res = await csrfFetch("{{ url_for('jobs.preview_allocation') }}", { method: "POST", body });
+            this.preview = await res.json();
+            this.previewLoading = false;
+        },
+        fillSubject(templateId) {
+            const subjectField = this.$refs.subjectField;
+            if (!subjectField.value) {
+                subjectField.value = this.templateSubjects[templateId] || "";
+            }
+        }
+     }'
+     x-init="$nextTick(() => { previewAllocation(); fillSubject($refs.templateField.value); })"
+>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Job name</label>
+            {{ form.name(class_="w-full border rounded px-3 py-2 text-sm") }}
+            {% for error in form.name.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Template</label>
+            {{ form.template_id(**{"class": "w-full border rounded px-3 py-2 text-sm", "x-ref": "templateField", "x-on:change": "fillSubject($event.target.value)"}) }}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Recipient list</label>
+            {{ form.recipient_list_id(**{"class": "w-full border rounded px-3 py-2 text-sm", "x-ref": "recipientList", "x-on:change": "previewAllocation()"}) }}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Subject</label>
+            {{ form.subject_override(**{"class": "w-full border rounded px-3 py-2 text-sm", "maxlength": "100", "x-ref": "subjectField"}) }}
+            {% for error in form.subject_override.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Schedule</label>
+            {{ form.schedule_choice(**{"class": "w-full border rounded px-3 py-2 text-sm", "x-model": "schedule"}) }}
+        </div>
+
+        <div class="mb-6" x-show="schedule === 'later'">
+            <label class="block text-sm font-medium mb-1">Scheduled for</label>
+            {{ form.scheduled_at(class_="w-full border rounded px-3 py-2 text-sm") }}
+            {% for error in form.scheduled_at.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-6 border rounded-lg p-4 bg-gray-50">
+            <div class="text-sm font-medium mb-2">Allocation preview</div>
+            <p x-show="previewLoading" class="text-sm text-gray-500">Loading…</p>
+            <template x-if="preview">
+                <div>
+                    <table class="w-full text-sm mb-2">
+                        <tbody>
+                            <template x-for="row in preview.plan" :key="row.sender_email">
+                                <tr class="border-b">
+                                    <td class="py-1" x-text="row.sender_email"></td>
+                                    <td class="py-1 text-right" x-text="row.count"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <p x-show="preview.plan.length === 0" class="text-sm text-gray-500">No active senders with available quota.</p>
+                    <p x-show="preview.remaining > 0" class="text-sm text-yellow-700 font-medium">
+                        Only <span x-text="preview.total - preview.remaining"></span> of <span x-text="preview.total"></span>
+                        recipients can be sent today given current quota. The remaining <span x-text="preview.remaining"></span>
+                        will need a follow-up job.
+                    </p>
+                </div>
+            </template>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Create Job</button>
+            <a href="{{ url_for('jobs.list_jobs') }}" class="border text-sm rounded px-4 py-2 hover:bg-gray-50">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if sender else "Add" }} Sender — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="text-sm text-gray-500 mb-2">
+    <a href="{{ url_for('accounts.list_accounts') }}" class="hover:underline">Accounts</a> /
+    <a href="{{ url_for('senders.list_senders', account_id=account.id) }}" class="hover:underline">{{ account.label }}</a>
+</div>
+<h1 class="text-xl font-semibold mb-6">{{ "Edit" if sender else "Add" }} Sender</h1>
+
+<div class="bg-white border rounded-lg p-6 max-w-xl" x-data='{ alias: {{ (form.from_alias.data or "") | tojson }} }'>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Email address</label>
+            {{ form.email_address(class_="w-full border rounded px-3 py-2 text-sm") }}
+            {% for error in form.email_address.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">From alias <span class="text-gray-400" x-text="`(${alias.length}/15)`"></span></label>
+            {{ form.from_alias(**{"class": "w-full border rounded px-3 py-2 text-sm", "maxlength": "15", "x-model": "alias"}) }}
+            {% for error in form.from_alias.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Reply-to address</label>
+            {{ form.reply_to_address(class_="w-full border rounded px-3 py-2 text-sm") }}
+            {% for error in form.reply_to_address.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Reply-to alias</label>
+            {{ form.reply_to_alias(class_="w-full border rounded px-3 py-2 text-sm") }}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Baseline daily quota</label>
+            {{ form.baseline_daily_quota(class_="w-full border rounded px-3 py-2 text-sm") }}
+            <p class="text-xs text-gray-500 mt-1">
+                Manually-tracked estimate — adjust based on what you observe in the Alibaba console.
+                See the warm-up guidance for new senders.
+            </p>
+            {% for error in form.baseline_daily_quota.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-medium mb-1">Status</label>
+            {{ form.status(class_="w-full border rounded px-3 py-2 text-sm") }}
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Save</button>
+            <a href="{{ url_for('senders.list_senders', account_id=account.id) }}" class="border text-sm rounded px-4 py-2 hover:bg-gray-50">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

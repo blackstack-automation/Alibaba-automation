@@ -1,0 +1,17 @@
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="space-y-2 mb-4">
+      {% for category, message in messages %}
+        {% set styles = {
+          'success': 'bg-green-50 text-green-800 border-green-300',
+          'error': 'bg-red-50 text-red-800 border-red-300',
+          'warning': 'bg-yellow-50 text-yellow-800 border-yellow-300',
+          'message': 'bg-blue-50 text-blue-800 border-blue-300'
+        } %}
+        <div class="border rounded px-4 py-2 text-sm {{ styles.get(category, styles['message']) }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}

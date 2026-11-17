@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Recipients — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold">Recipients</h1>
+    <a href="{{ url_for('recipients.upload') }}" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">
+        + Upload List
+    </a>
+</div>
+
+{% if lists %}
+<div class="bg-white border rounded-lg overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">List name</th>
+                <th class="px-4 py-3">Total</th>
+                <th class="px-4 py-3">Valid</th>
+                <th class="px-4 py-3">Duplicates</th>
+                <th class="px-4 py-3">Invalid</th>
+                <th class="px-4 py-3">Uploaded</th>
+                <th class="px-4 py-3">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for list in lists %}
+            <tr>
+                <td class="px-4 py-3 font-medium">
+                    <a href="{{ url_for('recipients.view_list', list_id=list.id) }}" class="text-blue-600 hover:underline">{{ list.name }}</a>
+                </td>
+                <td class="px-4 py-3">{{ list.total_count }}</td>
+                <td class="px-4 py-3 text-green-700">{{ list.valid_count }}</td>
+                <td class="px-4 py-3 text-yellow-700">{{ list.duplicate_count }}</td>
+                <td class="px-4 py-3 text-red-700">{{ list.invalid_count }}</td>
+                <td class="px-4 py-3 text-gray-500">{{ list.created_at.strftime("%Y-%m-%d %H:%M") if list.created_at else "" }}</td>
+                <td class="px-4 py-3">
+                    <form method="POST" action="{{ url_for('recipients.delete_list', list_id=list.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="button" class="text-red-600 hover:underline"
+                            onclick="return requestConfirm(this.closest('form'), &quot;Delete list '{{ list.name }}'? This cannot be undone.&quot;)">
+                            Delete
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500">
+    No recipient lists yet. Upload a CSV or XLSX to get started.
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "partials/_status_badge.html" import status_badge %}
+{% block title %}Dashboard — Mail Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-6">Dashboard</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white border rounded-lg p-4">
+        <div class="text-sm text-gray-500">Sent today</div>
+        <div class="text-3xl font-semibold mt-1 text-green-700">{{ sent_today_total }}</div>
+    </div>
+    <div class="bg-white border rounded-lg p-4">
+        <div class="text-sm text-gray-500">Failed today</div>
+        <div class="text-3xl font-semibold mt-1 text-red-700">{{ failed_today_total }}</div>
+    </div>
+    <div class="bg-white border rounded-lg p-4">
+        <div class="text-sm text-gray-500">Success rate</div>
+        <div class="text-3xl font-semibold mt-1">{{ (success_rate ~ "%") if success_rate is not none else "—" }}</div>
+    </div>
+</div>
+
+{% if quota_suggestions %}
+<div class="mb-8 space-y-2"
+     x-data='{
+        dismissed: JSON.parse(localStorage.getItem("dismissedQuotaSuggestions") || "[]"),
+        dismiss(id) {
+            this.dismissed.push(id);
+            localStorage.setItem("dismissedQuotaSuggestions", JSON.stringify(this.dismissed));
+        }
+     }'
+>
+    {% for s in quota_suggestions %}
+    {% set suggestion_id = s.sender.id ~ "-" ~ s.direction %}
+    <div x-show='!dismissed.includes({{ suggestion_id | tojson }})'
+         class="flex items-start justify-between gap-4 border rounded-lg px-4 py-3 text-sm {{ 'bg-blue-50 border-blue-200 text-blue-900' if s.direction == 'raise' else 'bg-yellow-50 border-yellow-200 text-yellow-900' }}">
+        <span>{{ s.message }}</span>
+        <button type="button" class="text-xs underline shrink-0" x-on:click='dismiss({{ suggestion_id | tojson }})'>Dismiss</button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Active jobs</h2>
+{% if active_jobs %}
+<div class="bg-white border rounded-lg overflow-hidden mb-8">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">Job</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Sent / Total</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for job in active_jobs %}
+            <tr>
+                <td class="px-4 py-3">
+                    <a href="{{ url_for('jobs.list_jobs') }}" class="text-blue-600 hover:underline">{{ job.name }}</a>
+                </td>
+                <td class="px-4 py-3">{{ status_badge(job.status) }}</td>
+                <td class="px-4 py-3">{{ job.sent_count }} / {{ job.total_recipients }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500 mb-8">
+    No active jobs.
+</div>
+{% endif %}
+
+<h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Sender health</h2>
+{% if sender_rows %}
+<div class="bg-white border rounded-lg overflow-hidden mb-8">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">Account</th>
+                <th class="px-4 py-3">Sender</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Quota used today</th>
+                <th class="px-4 py-3">Last cooldown reason</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for row in sender_rows %}
+            <tr>
+                <td class="px-4 py-3">{{ row.sender.account.label }}</td>
+                <td class="px-4 py-3">{{ row.sender.email_address }}</td>
+                <td class="px-4 py-3">{{ status_badge(row.sender.status) }}</td>
+                <td class="px-4 py-3 w-56">
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                            {% set pct = ((row.sent_today / row.sender.baseline_daily_quota * 100) if row.sender.baseline_daily_quota else 0) | round(0, "floor") %}
+                            <div class="bg-blue-600 h-2" style="width: {{ [pct, 100] | min }}%"></div>
+                        </div>
+                        <span class="text-xs text-gray-500 whitespace-nowrap">{{ row.sent_today }} / {{ row.sender.baseline_daily_quota }}</span>
+                    </div>
+                </td>
+                <td class="px-4 py-3 text-gray-500">{{ row.sender.last_cooldown_reason or "—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500 mb-8">
+    No senders configured yet.
+</div>
+{% endif %}
+
+<div class="flex gap-3">
+    <a href="{{ url_for('jobs.list_jobs') }}" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">New Job</a>
+    <a href="{{ url_for('recipients.list_recipients') }}" class="bg-white border text-sm rounded px-4 py-2 hover:bg-gray-50">Upload Recipients</a>
+    <a href="{{ url_for('accounts.list_accounts') }}" class="bg-white border text-sm rounded px-4 py-2 hover:bg-gray-50">Add Account</a>
+</div>
+{% endblock %}

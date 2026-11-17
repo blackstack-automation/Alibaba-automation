@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mail Dashboard{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen flex flex-col">
+    {% if current_user.is_authenticated %}
+    <header class="bg-gray-900 text-white">
+        <nav class="max-w-7xl mx-auto px-4 flex items-center justify-between h-14" hx-boost="true">
+            <a href="{{ url_for('dashboard.index') }}" class="font-semibold tracking-tight">Mail Dashboard</a>
+            <div class="flex items-center gap-6 text-sm">
+                <a href="{{ url_for('dashboard.index') }}" class="hover:text-blue-300">Dashboard</a>
+                <a href="{{ url_for('accounts.list_accounts') }}" class="hover:text-blue-300">Accounts</a>
+                <a href="{{ url_for('mail_templates.list_templates') }}" class="hover:text-blue-300">Templates</a>
+                <a href="{{ url_for('recipients.list_recipients') }}" class="hover:text-blue-300">Recipients</a>
+                <a href="{{ url_for('jobs.list_jobs') }}" class="hover:text-blue-300">Jobs</a>
+            </div>
+            <div class="flex items-center gap-4 text-sm">
+                <span class="text-gray-400">{{ current_user.email }}</span>
+                <a href="{{ url_for('auth.logout') }}" class="hover:text-blue-300">Logout</a>
+            </div>
+        </nav>
+    </header>
+    {% endif %}
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+        {% include "partials/_flash_messages.html" %}
+        {% block content %}{% endblock %}
+    </main>
+
+    {% include "partials/_confirm_modal.html" %}
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

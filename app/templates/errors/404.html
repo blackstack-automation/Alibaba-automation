@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Not Found — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto mt-20 text-center">
+    <div class="text-5xl font-bold text-gray-300 mb-4">404</div>
+    <h1 class="text-lg font-semibold mb-2">Page not found</h1>
+    <p class="text-sm text-gray-500 mb-6">The page you're looking for doesn't exist or may have been moved.</p>
+    <a href="{{ url_for('dashboard.index') }}" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">
+        Back to Dashboard
+    </a>
+</div>
+{% endblock %}

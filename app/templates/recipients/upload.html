@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Upload Recipients — Mail Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-6">Upload Recipients</h1>
+
+<div class="flex items-center gap-2 mb-6 text-sm">
+    <span class="{{ 'font-semibold text-gray-900' if stage == 'upload' else 'text-gray-400' }}">1. Upload</span>
+    <span class="text-gray-300">→</span>
+    <span class="{{ 'font-semibold text-gray-900' if stage == 'map' else 'text-gray-400' }}">2. Map columns</span>
+    <span class="text-gray-300">→</span>
+    <span class="{{ 'font-semibold text-gray-900' if stage == 'review' else 'text-gray-400' }}">3. Review &amp; confirm</span>
+</div>
+
+{% if stage == "upload" %}
+<div class="bg-white border rounded-lg p-6 max-w-lg">
+    <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="block border-2 border-dashed rounded-lg p-8 text-center text-sm text-gray-500 cursor-pointer hover:border-gray-400">
+            <input type="file" name="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="this.form.querySelector('button[type=submit]').disabled=false; this.closest('label').querySelector('span').textContent = this.files[0]?.name || 'Drop a CSV or XLSX file here, or click to browse'">
+            <span>Drop a CSV or XLSX file here, or click to browse</span>
+        </label>
+        <button type="submit" class="mt-4 bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">
+            Continue
+        </button>
+    </form>
+</div>
+
+{% elif stage == "map" %}
+<div class="bg-white border rounded-lg p-6">
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="upload_token" value="{{ upload_token }}">
+        <input type="hidden" name="source_filename" value="{{ source_filename }}">
+
+        <div class="mb-4 max-w-sm">
+            <label class="block text-sm font-medium mb-1">List name</label>
+            <input type="text" name="list_name" value="{{ list_name }}" required class="w-full border rounded px-3 py-2 text-sm">
+        </div>
+
+        <p class="text-sm text-gray-500 mb-3">{{ row_count }} rows detected. Map each column to a field:</p>
+
+        <div class="overflow-x-auto mb-4">
+            <table class="w-full text-sm border">
+                <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                    <tr>
+                        <th class="px-3 py-2">Column</th>
+                        <th class="px-3 py-2">Sample value</th>
+                        <th class="px-3 py-2">Maps to</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for col in columns %}
+                    <tr>
+                        <td class="px-3 py-2 font-medium">{{ col }}</td>
+                        <td class="px-3 py-2 text-gray-500">
+                            {{ sample_rows[0][col] if sample_rows else "" }}
+                        </td>
+                        <td class="px-3 py-2">
+                            <select name="map__{{ col }}" class="border rounded px-2 py-1 text-sm">
+                                <option value="ignore" {{ "selected" if guessed_mapping.get(col, "ignore") == "ignore" else "" }}>Ignore</option>
+                                <option value="email_address" {{ "selected" if guessed_mapping.get(col) == "email_address" else "" }}>Email address</option>
+                                <option value="first_name" {{ "selected" if guessed_mapping.get(col) == "first_name" else "" }}>First name</option>
+                                <option value="last_name" {{ "selected" if guessed_mapping.get(col) == "last_name" else "" }}>Last name</option>
+                                <option value="custom" {{ "selected" if guessed_mapping.get(col) == "custom" else "" }}>Custom field</option>
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Continue</button>
+            <a href="{{ url_for('recipients.upload') }}" class="border text-sm rounded px-4 py-2 hover:bg-gray-50">Start over</a>
+        </div>
+    </form>
+</div>
+
+{% elif stage == "review" %}
+<div class="bg-white border rounded-lg p-6">
+    <div class="grid grid-cols-4 gap-4 mb-6">
+        <div>
+            <div class="text-sm text-gray-500">Total rows</div>
+            <div class="text-2xl font-semibold">{{ total_count }}</div>
+        </div>
+        <div>
+            <div class="text-sm text-gray-500">Valid</div>
+            <div class="text-2xl font-semibold text-green-700">{{ valid_count }}</div>
+        </div>
+        <div>
+            <div class="text-sm text-gray-500">Duplicates</div>
+            <div class="text-2xl font-semibold text-yellow-700">{{ duplicate_count }}</div>
+        </div>
+        <div>
+            <div class="text-sm text-gray-500">Invalid</div>
+            <div class="text-2xl font-semibold text-red-700">{{ invalid_count }}</div>
+        </div>
+    </div>
+
+    <p class="text-sm text-gray-500 mb-3">Preview (first {{ preview_rows | length }} rows):</p>
+    <div class="overflow-x-auto mb-6">
+        <table class="w-full text-sm border">
+            <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                <tr>
+                    <th class="px-3 py-2">Email</th>
+                    <th class="px-3 py-2">First name</th>
+                    <th class="px-3 py-2">Last name</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y">
+                {% for row in preview_rows %}
+                <tr>
+                    <td class="px-3 py-2">{{ row.email_address }}</td>
+                    <td class="px-3 py-2">{{ row.first_name }}</td>
+                    <td class="px-3 py-2">{{ row.last_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="upload_token" value="{{ upload_token }}">
+        <input type="hidden" name="source_filename" value="{{ source_filename }}">
+        <input type="hidden" name="list_name" value="{{ list_name }}">
+        <input type="hidden" name="confirm" value="1">
+        {% for col, target in mapping.items() %}
+        <input type="hidden" name="map__{{ col }}" value="{{ target }}">
+        {% endfor %}
+        <div class="flex gap-3">
+            <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Confirm &amp; Import</button>
+            <a href="{{ url_for('recipients.upload') }}" class="border text-sm rounded px-4 py-2 hover:bg-gray-50">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

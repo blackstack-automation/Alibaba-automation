@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% from "partials/_status_badge.html" import status_badge %}
+{% block title %}{{ job.name }} — Mail Dashboard{% endblock %}
+{% block content %}
+<div
+    x-data='{
+        sent: {{ job.sent_count }},
+        failed: {{ job.failed_count }},
+        total: {{ job.total_recipients }},
+        status: {{ job.status | tojson }},
+        get remaining() { return Math.max(this.total - this.sent - this.failed, 0); },
+        get pct() { return this.total ? Math.round(((this.sent + this.failed) / this.total) * 100) : 0; },
+        init() {
+            if (["sending", "queued"].includes(this.status)) {
+                this.connect();
+            }
+        },
+        connect() {
+            const src = new EventSource("{{ url_for('jobs.status_stream', job_id=job.id) }}");
+            src.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                this.sent = data.sent;
+                this.failed = data.failed;
+                this.total = data.total;
+                this.status = data.status;
+                if (!["sending", "queued"].includes(data.status)) {
+                    src.close();
+                    if (["completed", "completed_with_errors", "cancelled", "failed"].includes(data.status)) {
+                        setTimeout(() => window.location.reload(), 500);
+                    }
+                }
+            };
+            src.onerror = () => src.close();
+        }
+     }'
+>
+    <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-3">
+            <h1 class="text-xl font-semibold">{{ job.name }}</h1>
+            {{ status_badge(job.status) }}
+        </div>
+        <div class="flex gap-3">
+            {% if job.status == "pending" %}
+            <form method="POST" action="{{ url_for('jobs.send_now', job_id=job.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Send Now</button>
+            </form>
+            {% elif job.status == "sending" %}
+            <form method="POST" action="{{ url_for('jobs.pause_job', job_id=job.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="border text-sm rounded px-4 py-2 hover:bg-gray-50">Pause</button>
+            </form>
+            {% elif job.status == "paused" %}
+            <form method="POST" action="{{ url_for('jobs.resume_job_route', job_id=job.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Resume</button>
+            </form>
+            {% endif %}
+            {% if job.status in ("pending", "queued", "sending", "paused") %}
+            <form method="POST" action="{{ url_for('jobs.cancel_job', job_id=job.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="button" class="border border-red-300 text-red-600 text-sm rounded px-4 py-2 hover:bg-red-50"
+                    onclick="return requestConfirm(this.closest('form'), 'Cancel this job? Already-sent recipients are unaffected, but no further sends will happen.')">
+                    Cancel
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    <p class="text-sm text-gray-500 mb-6">
+        Template: {{ job.template.name if job.template else "—" }} ·
+        Recipient list: {{ job.recipient_list.name if job.recipient_list else "—" }}
+        {% if job.scheduled_at %} · Scheduled: {{ job.scheduled_at.strftime("%Y-%m-%d %H:%M") }}{% endif %}
+    </p>
+
+    <div class="w-full bg-gray-100 rounded-full h-2 mb-6 overflow-hidden">
+        <div class="bg-blue-600 h-2 transition-all" :style="`width: ${pct}%`"></div>
+    </div>
+
+    <div class="grid grid-cols-4 gap-4 mb-8">
+        <div class="bg-white border rounded-lg p-4">
+            <div class="text-sm text-gray-500">Sent</div>
+            <div class="text-2xl font-semibold text-green-700" x-text="sent"></div>
+        </div>
+        <div class="bg-white border rounded-lg p-4">
+            <div class="text-sm text-gray-500">Failed</div>
+            <div class="text-2xl font-semibold text-red-700" x-text="failed"></div>
+        </div>
+        <div class="bg-white border rounded-lg p-4">
+            <div class="text-sm text-gray-500">Remaining</div>
+            <div class="text-2xl font-semibold text-gray-500" x-text="remaining"></div>
+        </div>
+        <div class="bg-white border rounded-lg p-4">
+            <div class="text-sm text-gray-500">Total</div>
+            <div class="text-2xl font-semibold" x-text="total"></div>
+        </div>
+    </div>
+</div>
+
+<h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Per-sender allocation</h2>
+{% if allocations %}
+<div class="bg-white border rounded-lg overflow-hidden mb-8">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">Sender</th>
+                <th class="px-4 py-3">Allocated</th>
+                <th class="px-4 py-3">Sent</th>
+                <th class="px-4 py-3">Failed</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for allocation in allocations %}
+            <tr>
+                <td class="px-4 py-3">{{ allocation.sender.email_address if allocation.sender else "—" }}</td>
+                <td class="px-4 py-3">{{ allocation.allocated_count }}</td>
+                <td class="px-4 py-3">{{ allocation.sent_count }}</td>
+                <td class="px-4 py-3">{{ allocation.failed_count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500 mb-8">
+    No senders were available to allocate this job to.
+</div>
+{% endif %}
+
+<div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Failed recipients</h2>
+    {% if failed_logs %}
+    <a href="{{ url_for('jobs.export_failed', job_id=job.id) }}" class="text-sm text-blue-600 hover:underline">Export Failed as CSV</a>
+    {% endif %}
+</div>
+{% if failed_logs %}
+<div class="bg-white border rounded-lg overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">Email</th>
+                <th class="px-4 py-3">Sender used</th>
+                <th class="px-4 py-3">Error code</th>
+                <th class="px-4 py-3">Error message</th>
+                <th class="px-4 py-3">Time</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for log in failed_logs %}
+            <tr>
+                <td class="px-4 py-3">{{ log.recipient.email_address if log.recipient else "—" }}</td>
+                <td class="px-4 py-3">{{ log.sender.email_address if log.sender else "—" }}</td>
+                <td class="px-4 py-3">{{ log.error_code or "—" }}</td>
+                <td class="px-4 py-3 text-gray-500">{{ log.error_message or "—" }}</td>
+                <td class="px-4 py-3 text-gray-500">{{ log.sent_at.strftime("%Y-%m-%d %H:%M") if log.sent_at else "—" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500">
+    No failed sends yet.
+</div>
+{% endif %}
+
+{% if job.status == "pending" %}
+<p class="text-xs text-gray-400 mt-6">
+    This job hasn't been queued yet. Sending requires a running Celery worker connected to Redis,
+    and will only run against senders you've configured with real, verified Alibaba credentials.
+</p>
+{% endif %}
+{% endblock %}

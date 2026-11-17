@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "partials/_status_badge.html" import status_badge %}
+{% block title %}Jobs — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold">Jobs</h1>
+    <a href="{{ url_for('jobs.new_job') }}" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">
+        + New Job
+    </a>
+</div>
+
+{% if jobs %}
+<div class="bg-white border rounded-lg overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-500 uppercase text-xs">
+            <tr>
+                <th class="px-4 py-3">Name</th>
+                <th class="px-4 py-3">Template</th>
+                <th class="px-4 py-3">Recipient list</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3">Sent / Total</th>
+                <th class="px-4 py-3">Scheduled / Started</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for job in jobs %}
+            <tr>
+                <td class="px-4 py-3 font-medium">
+                    <a href="{{ url_for('jobs.view_job', job_id=job.id) }}" class="text-blue-600 hover:underline">{{ job.name }}</a>
+                </td>
+                <td class="px-4 py-3">{{ job.template.name if job.template else "—" }}</td>
+                <td class="px-4 py-3">{{ job.recipient_list.name if job.recipient_list else "—" }}</td>
+                <td class="px-4 py-3">{{ status_badge(job.status) }}</td>
+                <td class="px-4 py-3">{{ job.sent_count }} / {{ job.total_recipients }}</td>
+                <td class="px-4 py-3 text-gray-500">
+                    {{ job.scheduled_at.strftime("%Y-%m-%d %H:%M") if job.scheduled_at else (job.started_at.strftime("%Y-%m-%d %H:%M") if job.started_at else "—") }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white border rounded-lg p-6 text-sm text-gray-500">
+    No jobs yet. Create one once you have a template and a recipient list ready.
+</div>
+{% endif %}
+{% endblock %}

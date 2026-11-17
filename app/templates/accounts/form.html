@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if account else "Add" }} Account — Mail Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-6">{{ "Edit" if account else "Add" }} Account</h1>
+
+<div class="bg-white border rounded-lg p-6 max-w-xl"
+     x-data="{
+        testing: false,
+        result: null,
+        resultOk: false,
+        async testConnection() {
+            this.testing = true;
+            this.result = null;
+            const form = this.$refs.accountForm;
+            const body = new FormData();
+            body.append('access_key_id', form.access_key_id.value);
+            body.append('access_key_secret', form.access_key_secret.value);
+            body.append('region_endpoint', form.region_endpoint.value);
+            try {
+                const res = await csrfFetch('{{ url_for("accounts.test_connection_existing", account_id=account.id) if account else url_for("accounts.test_connection_new") }}', {
+                    method: 'POST',
+                    body,
+                });
+                const data = await res.json();
+                this.resultOk = !!data.ok;
+                this.result = data.ok
+                    ? `Connected. Daily quota: ${data.daily_quota ?? 'n/a'}, month quota: ${data.month_quota ?? 'n/a'}`
+                    : `Failed: ${data.error}`;
+            } catch (e) {
+                this.resultOk = false;
+                this.result = 'Failed: ' + e;
+            } finally {
+                this.testing = false;
+            }
+        }
+     }"
+>
+    <form method="POST" x-ref="accountForm">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Label</label>
+            {{ form.label(class_="w-full border rounded px-3 py-2 text-sm") }}
+            {% for error in form.label.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Access Key ID</label>
+            {{ form.access_key_id(class_="w-full border rounded px-3 py-2 text-sm") }}
+            {% for error in form.access_key_id.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Access Key Secret</label>
+            {{ form.access_key_secret(class_="w-full border rounded px-3 py-2 text-sm", placeholder=("Leave blank to keep current secret" if account else "")) }}
+            {% for error in form.access_key_secret.errors %}<p class="text-xs text-red-600 mt-1">{{ error }}</p>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Region endpoint</label>
+            {{ form.region_endpoint(class_="w-full border rounded px-3 py-2 text-sm") }}
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-medium mb-1">Notes</label>
+            {{ form.notes(class_="w-full border rounded px-3 py-2 text-sm", rows=3) }}
+        </div>
+
+        <div class="flex items-center gap-3 mb-4">
+            <button type="button" x-on:click="testConnection()" :disabled="testing"
+                class="border rounded px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50">
+                <span x-show="!testing">Test Connection</span>
+                <span x-show="testing">Testing…</span>
+            </button>
+            <span x-show="result" :class="resultOk ? 'text-green-700' : 'text-red-700'" class="text-sm" x-text="result"></span>
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit" class="bg-gray-900 text-white text-sm rounded px-4 py-2 hover:bg-gray-800">Save</button>
+            <a href="{{ url_for('accounts.list_accounts') }}" class="border text-sm rounded px-4 py-2 hover:bg-gray-50">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

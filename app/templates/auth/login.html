@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Login — Mail Dashboard{% endblock %}
+{% block content %}
+<div class="max-w-sm mx-auto mt-20 bg-white border rounded-lg p-6 shadow-sm">
+    <h1 class="text-lg font-semibold mb-4">Sign in</h1>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="mb-4">
+            <label class="block text-sm font-medium mb-1" for="email">Email</label>
+            {{ form.email(class_="w-full border rounded px-3 py-2 text-sm", id="email", autofocus=true) }}
+        </div>
+        <div class="mb-6">
+            <label class="block text-sm font-medium mb-1" for="password">Password</label>
+            {{ form.password(class_="w-full border rounded px-3 py-2 text-sm", id="password") }}
+        </div>
+        <button type="submit" class="w-full bg-gray-900 text-white rounded py-2 text-sm font-medium hover:bg-gray-800">
+            Sign in
+        </button>
+    </form>
+</div>
+{% endblock %}
