@@ -5,7 +5,7 @@ from wtforms import StringField, PasswordField
 from wtforms.validators import DataRequired, Email
 from datetime import datetime, timezone
 
-from app.extensions import db, limiter
+from app.extensions import db
 from app.models.user import User
 
 auth_bp = Blueprint("auth", __name__)
@@ -17,7 +17,6 @@ class LoginForm(FlaskForm):
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("10 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard.index"))

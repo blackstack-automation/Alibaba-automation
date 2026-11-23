@@ -53,7 +53,7 @@ EOF
     echo "   $ENCRYPTION_KEY"
     echo " It encrypts every Alibaba AccessKey secret. If it is lost, all"
     echo " stored account credentials are unrecoverable and must be"
-    echo " re-entered. It is NOT included in the database backups."
+    echo " re-entered."
     echo "################################################################"
     echo
 fi
@@ -79,10 +79,7 @@ done
 sudo systemctl daemon-reload
 sudo systemctl enable --now mail-dashboard-web mail-dashboard-worker mail-dashboard-beat
 
-echo "==> Daily database backup (03:15)"
-chmod +x deploy/backup.sh deploy/update.sh
-CRON_LINE="15 3 * * * $APP_DIR/deploy/backup.sh >> $HOME/backup.log 2>&1"
-( crontab -l 2>/dev/null | grep -vF "deploy/backup.sh" ; echo "$CRON_LINE" ) | crontab -
+chmod +x deploy/update.sh
 
 echo "==> Health check"
 sleep 3

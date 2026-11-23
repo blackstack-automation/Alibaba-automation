@@ -6,9 +6,8 @@ Wants=redis-server.service
 [Service]
 User=__APP_USER__
 WorkingDirectory=__APP_DIR__
-# One process + many threads (not several processes): the live job page holds an
-# SSE connection open per viewer, which needs threads, and a single process keeps
-# the login rate limiter's in-memory counters accurate.
+# One process + many threads: the live job page holds an SSE connection open per
+# viewer, which needs threads.
 ExecStart=__APP_DIR__/venv/bin/gunicorn --worker-class gthread --workers 1 --threads 16 --timeout 120 --bind 127.0.0.1:8000 --access-logfile - wsgi:app
 Restart=always
 RestartSec=3

@@ -15,7 +15,7 @@ from sqlalchemy import event  # noqa: E402
 from sqlalchemy.engine import Engine  # noqa: E402
 
 from app.config import get_config  # noqa: E402
-from app.extensions import db, migrate, login_manager, csrf, limiter  # noqa: E402
+from app.extensions import db, migrate, login_manager, csrf  # noqa: E402
 
 
 @event.listens_for(Engine, "connect")
@@ -40,7 +40,6 @@ def create_app(log_filename="app.log"):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
-    limiter.init_app(app)
 
     from app.models.user import User
 

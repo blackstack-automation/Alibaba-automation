@@ -3,7 +3,7 @@
 Everything below assumes a brand-new server. Total time: about 15 minutes.
 
 What you end up with: gunicorn (web) + Celery worker + Celery beat, each a
-systemd service that restarts itself, Redis on localhost, a daily DB backup,
+systemd service that restarts itself, Redis on localhost,
 and the app reachable either through an SSH tunnel or nginx + HTTPS.
 
 ## 1. First login (as root, once)
@@ -48,11 +48,11 @@ bash deploy/setup.sh
 
 It installs Redis/nginx/Python deps, generates fresh `SECRET_KEY` and
 `ENCRYPTION_KEY`, migrates the database, optionally creates your admin login,
-installs and starts the three services, and schedules the nightly backup.
+and installs and starts the three services.
 
 **It prints the `ENCRYPTION_KEY` once. Copy it into a password manager
 immediately.** It encrypts every stored Alibaba AccessKey secret and is
-deliberately not part of the DB backups. Without it those secrets are gone.
+Without it those secrets are gone.
 
 Check the services any time with:
 
@@ -104,21 +104,7 @@ cd ~/mail-dashboard && bash deploy/update.sh
 Pulls from GitHub, installs new dependencies, runs migrations, restarts the
 three services.
 
-## 6. Backups
-
-- **Database:** `deploy/backup.sh` runs nightly at 03:15 (installed by setup),
-  writing to `~/backups/` and keeping 14 days. These live on the same server,
-  so also copy them off the VPS periodically (`scp`, `rclone`, or your
-  provider's snapshot feature). A backup that dies with the server is the
-  problem you are trying to avoid.
-- **`ENCRYPTION_KEY`:** password manager. Not in any backup by design.
-- **Code:** GitHub. Push after every change.
-
-Restoring after a rebuild: stop the services, copy a backup over
-`instance/mail_dashboard.db`, make sure `.env` has the **same** `ENCRYPTION_KEY`,
-start the services.
-
-## 7. Before the first real send
+## 6. Before the first real send
 
 The send pipeline has never run against real Alibaba. Per the development plan:
 
@@ -139,7 +125,3 @@ Also: the first admin password should be a real one, and if you ever used
 | Live counters never update behind nginx | the `/jobs/<id>/status` block in the nginx config (`proxy_buffering off`) |
 | 502 from nginx | `systemctl status mail-dashboard-web`, `journalctl -u mail-dashboard-web -n 50` |
 | `instance/logs/worker.log` looks incomplete | Celery takes over logging; `journalctl -u mail-dashboard-worker` is authoritative |
-
-Note: the login rate limiter keeps its counters in memory. That is accurate
-here only because gunicorn runs a single process (many threads). If you ever
-raise `--workers`, move the limiter to Redis first.
